@@ -20,7 +20,7 @@ function RestrictedMaster(paths, Cost, Time)
     @variable(m, λ[1:length(paths)] >= 0) # relaxation
     # @show λ
     @objective(m, Min, sum(Cost[i] * λ[i] for i in 1:length(paths)))
-    @constraint(m, resource, sum(Time[i] * λ[i] for i in 1:length(paths)) <= 13)
+    @constraint(m, resource, sum(Time[i] * λ[i] for i in 1:length(paths)) <= 14)
     @constraint(m, convexity, sum(λ[i] for i in 1:length(paths)) == 1)
     optimize!(m)
 
@@ -171,7 +171,7 @@ function ColumnGeneration(origin, destination, arc_cost, arc_time, paths, Cost, 
     end
 end
 
-ColumnGeneration(origin, destination, arc_cost, arc_time, paths, Cost, Time)
+# ColumnGeneration(origin, destination, arc_cost, arc_time, paths, Cost, Time)
 # @show value.(λ)
 # @show π1, π0
 # @show objective_value(m)
