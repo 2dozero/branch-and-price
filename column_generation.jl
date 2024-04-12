@@ -20,7 +20,7 @@ function RestrictedMaster(paths, Cost, Time)
     @variable(m, λ[1:length(paths)] >= 0) # relaxation
     # @show λ
     @objective(m, Min, sum(Cost[i] * λ[i] for i in 1:length(paths)))
-    @constraint(m, resource, sum(Time[i] * λ[i] for i in 1:length(paths)) <= 15)
+    @constraint(m, resource, sum(Time[i] * λ[i] for i in 1:length(paths)) <= 13)
     @constraint(m, convexity, sum(λ[i] for i in 1:length(paths)) == 1)
     optimize!(m)
 
@@ -35,6 +35,28 @@ function RestrictedMaster(paths, Cost, Time)
     return m, λ, π1, π0, status
 end
 
+# function RestrictedMaster(paths, Cost, Time)
+#     m = Model(HiGHS.Optimizer)
+#     @variable(m, λ[1:length(paths)] >= 0) # relaxation
+#     @variable(m, y_0 >= 0) # artificial variable
+#     # Add the artificial variable to the objective with a large cost
+#     @objective(m, Min, sum(Cost[i] * λ[i] for i in 1:length(paths)) + 100 * y_0)
+#     # Relax the resource constraint
+#     @constraint(m, resource, sum(Time[i] * λ[i] for i in 1:length(paths))  + y_0 <= 9)
+#     # Include the artificial variable in the convexity constraint
+#     @constraint(m, convexity, sum(λ[i] for i in 1:length(paths)) + y_0 == 1)
+#     optimize!(m)
+#     status = termination_status(m)
+#     if status == MOI.INFEASIBLE
+#         π1 = 0
+#         π0 = 0
+#     else
+#         π1 = dual(resource)
+#         π0 = dual(convexity)
+#     end
+#     return m, λ, π1, π0, status
+# end
+
 function PricingSubproblem(π1, π0, origin, destination, arc_cost, arc_time)
     g = SimpleWeightedDiGraph(n_nodes)
     for i in 1:n_arcs
@@ -46,16 +68,23 @@ function PricingSubproblem(π1, π0, origin, destination, arc_cost, arc_time)
     return min_reduced_cost, new_column
 end
 
-function PricingSubproblem(π1, π0, origin, destination, arc_cost, arc_time, branching_variables_history, variable_value)
+function PricingSubproblem(π1, π0, origin, destination, arc_cost, arc_time, branching_variables_history, branching_variables_values)
     # @show branching_variables_history
     # @show variable_value
     g = SimpleWeightedDiGraph(n_nodes)
     epsilon = 1e-6
-    for i in 1:n_arcs
-        weight = arc_cost[i] - arc_time[i] * π1
-        if [start_node[i], end_node[i]] in branching_variables_history
-            weight *= variable_value == 0 ? Inf : -epsilon
+    for j in 1:length(branching_variables_values)
+        weight = arc_cost[j] - arc_time[j] * π1
+        if [start_node[j], end_node[j]] in branching_variables_history
+            weight *= branching_variables_values[j] == 0 ? Inf : -epsilon
         end
+        add_edge!(g, start_node[j], end_node[j], weight) # cost redifined
+    end
+    for i in length(branching_variables_values)+1:n_arcs
+        weight = arc_cost[i] - arc_time[i] * π1
+        # if [start_node[i], end_node[i]] in branching_variables_history
+        #     weight *= branching_variables_values[i] == 0 ? Inf : -epsilon
+        # end
         add_edge!(g, start_node[i], end_node[i], weight) # cost redifined
     end
     bf_state = bellman_ford_shortest_paths(g, origin)
@@ -104,14 +133,14 @@ function ColumnGeneration(origin, destination, arc_cost, arc_time, paths, Cost, 
     end
 end
 
-function ColumnGeneration(origin, destination, arc_cost, arc_time, paths, Cost, Time, branching_variables_history, variable_value)
+function ColumnGeneration(origin, destination, arc_cost, arc_time, paths, Cost, Time, branching_variables_history, branching_variables_values)
     m, λ, π1, π0, status = RestrictedMaster(paths, Cost, Time)
     if status == MOI.INFEASIBLE
         return m, λ, π1, π0, status
     end
-    min_reduced_cost, new_column = PricingSubproblem(π1, π0, origin, destination, arc_cost, arc_time, branching_variables_history, variable_value)
+    min_reduced_cost, new_column = PricingSubproblem(π1, π0, origin, destination, arc_cost, arc_time, branching_variables_history, branching_variables_values)
     if min_reduced_cost < 0
-        # @show paths
+        @show paths
         # @show min_reduced_cost
         push!(paths, new_column)
         new_cost = 0
@@ -127,11 +156,12 @@ function ColumnGeneration(origin, destination, arc_cost, arc_time, paths, Cost, 
         push!(Cost, new_cost)
         # @show Cost
         push!(Time, new_time)
-        # @show Time
+        # # @show Time
         # @show paths
         m, λ, π1, π0, status = RestrictedMaster(paths, Cost, Time)
         @show paths
-        return ColumnGeneration(origin, destination, arc_cost, arc_time, paths, Cost, Time)
+        # return ColumnGeneration(origin, destination, arc_cost, arc_time, paths, Cost, Time)
+        return ColumnGeneration(origin, destination, arc_cost, arc_time, paths, Cost, Time, branching_variables_history, branching_variables_values)
     else
         return m, λ, π1, π0, status
         # @show raw_status(m)
@@ -141,7 +171,7 @@ function ColumnGeneration(origin, destination, arc_cost, arc_time, paths, Cost, 
     end
 end
 
-# ColumnGeneration(origin, destination, arc_cost, arc_time, paths, Cost, Time)
+ColumnGeneration(origin, destination, arc_cost, arc_time, paths, Cost, Time)
 # @show value.(λ)
 # @show π1, π0
 # @show objective_value(m)
