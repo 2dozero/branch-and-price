@@ -20,7 +20,7 @@ function RestrictedMaster(paths, Cost, Time)
     @variable(m, λ[1:length(paths)] >= 0) # relaxation
     # @show λ
     @objective(m, Min, sum(Cost[i] * λ[i] for i in 1:length(paths)))
-    @constraint(m, resource, sum(Time[i] * λ[i] for i in 1:length(paths)) <= 18)
+    @constraint(m, resource, sum(Time[i] * λ[i] for i in 1:length(paths)) <= 14)
     @constraint(m, convexity, sum(λ[i] for i in 1:length(paths)) == 1)
     optimize!(m)
 
@@ -38,30 +38,32 @@ end
 function PricingSubproblem(π1, π0, origin, destination, arc_cost, arc_time)
     g = SimpleWeightedDiGraph(n_nodes)
     for i in 1:n_arcs
-        weight = arc_cost[i] - arc_time[i] * π1
-        add_edge!(g, start_node[i], end_node[i], weight) # cost redifined
+        add_edge!(g, start_node[i], end_node[i], arc_cost[i] - arc_time[i] * π1) # cost redifined
     end
     bf_state = bellman_ford_shortest_paths(g, origin)
     min_reduced_cost = bf_state.dists[destination] - π0
     new_column = enumerate_paths(bf_state)[destination]
-    path_weight = calculate_path_weight(new_column, start_node, end_node, arc_cost, arc_time, π1)
-    return path_weight, new_column
+    return min_reduced_cost, new_column
 end
 
-function PricingSubproblem(π1, π0, origin, destination, arc_cost, arc_time, branching_variable, variable_value)
+function PricingSubproblem(π1, π0, origin, destination, arc_cost, arc_time, branching_variables_history, variable_value)
+    # @show branching_variables_history
+    # @show variable_value
     g = SimpleWeightedDiGraph(n_nodes)
     epsilon = 1e-6
     for i in 1:n_arcs
         weight = arc_cost[i] - arc_time[i] * π1
-        if [start_node[i], end_node[i]] in branching_variable
+        if [start_node[i], end_node[i]] in branching_variables_history
             weight *= variable_value == 0 ? Inf : -epsilon
         end
         add_edge!(g, start_node[i], end_node[i], weight) # cost redifined
     end
     bf_state = bellman_ford_shortest_paths(g, origin)
-    min_reduced_cost = bf_state.dists[destination] - π0
+    @show bf_state
+    min_reduced_cost = bf_state.dists[destination] - π0 
+    @show min_reduced_cost
     new_column = enumerate_paths(bf_state)[destination]
-    path_weight = calculate_path_weight(new_column, start_node, end_node, arc_cost, arc_time, π1)
+    path_weight = calculate_path_weight(new_column, start_node, end_node, arc_cost, arc_time, π1) - π0
     return path_weight, new_column
 end
 
@@ -102,16 +104,12 @@ function ColumnGeneration(origin, destination, arc_cost, arc_time, paths, Cost, 
     end
 end
 
-function ColumnGeneration(origin, destination, arc_cost, arc_time, paths, Cost, Time, branching_variable, variable_value)
+function ColumnGeneration(origin, destination, arc_cost, arc_time, paths, Cost, Time, branching_variables_history, variable_value)
     m, λ, π1, π0, status = RestrictedMaster(paths, Cost, Time)
     if status == MOI.INFEASIBLE
         return m, λ, π1, π0, status
     end
-    if branching_variable == nothing && variable_value == nothing
-        min_reduced_cost, new_column = PricingSubproblem(π1, π0, origin, destination, arc_cost, arc_time)
-    else
-        min_reduced_cost, new_column = PricingSubproblem(π1, π0, origin, destination, arc_cost, arc_time, branching_variable, variable_value)
-    end
+    min_reduced_cost, new_column = PricingSubproblem(π1, π0, origin, destination, arc_cost, arc_time, branching_variables_history, variable_value)
     if min_reduced_cost < 0
         # @show paths
         # @show min_reduced_cost

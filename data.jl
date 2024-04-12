@@ -34,6 +34,8 @@ path1 = [1, 2, 4, 5, 6]
 path2 = [1, 2, 4, 6]
 path3 = [1, 3, 2, 5, 6]
 path4 = [1, 2, 5, 6]
+
 paths = [path1, path2, path3, path4]
 Cost = [14, 3, 15, 5]
 Time = [14, 18, 10, 15]
+
