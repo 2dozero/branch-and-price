@@ -55,7 +55,6 @@ function BranchAndBound(origin, destination, arc_cost, arc_time, paths, Cost, Ti
             second_indices = setdiff(1:length(paths), first_indices)
 
             indices_dict = Dict(1 => first_indices, 2 => second_indices)
-            # variable_value = Dict(1 => 0, 2 => 1)
             for i in 1:2
                 new_paths = paths[indices_dict[i]]
                 new_Cost = Cost[indices_dict[i]]
@@ -67,7 +66,6 @@ function BranchAndBound(origin, destination, arc_cost, arc_time, paths, Cost, Ti
                 if status != MOI.INFEASIBLE
                     child = BBTNode((m, λ, π1, π0, new_paths, new_Cost, new_Time), node, [], branching_variable, false)
                     push!(subproblems, child)
-                    # branching_variable_history가 저장이 안되고 있는 느낌. tree구조에서 어떻게 저장할 수 있지?
                 end
             end
         end
