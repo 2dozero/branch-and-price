@@ -20,7 +20,7 @@ function RestrictedMaster(paths, Cost, Time)
     @variable(m, λ[1:length(paths)] >= 0) # relaxation
     # @show λ
     @objective(m, Min, sum(Cost[i] * λ[i] for i in 1:length(paths)))
-    @constraint(m, resource, sum(Time[i] * λ[i] for i in 1:length(paths)) <= 14)
+    @constraint(m, resource, sum(Time[i] * λ[i] for i in 1:length(paths)) <= 15)
     @constraint(m, convexity, sum(λ[i] for i in 1:length(paths)) == 1)
     optimize!(m)
 

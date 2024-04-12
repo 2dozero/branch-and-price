@@ -33,6 +33,7 @@ function BranchAndBound(origin, destination, arc_cost, arc_time, paths, Cost, Ti
     subproblems = Deque{BBTNode}()
     push!(subproblems, root)
 
+    branching_variables_history = [] ##
     while !isempty(subproblems)
         node = popfirst!(subproblems)
         m, λ, π1, π0, paths, Cost, Time = node.data
@@ -42,7 +43,7 @@ function BranchAndBound(origin, destination, arc_cost, arc_time, paths, Cost, Ti
             continue
 
         else
-            branching_variables_history = [] ##
+            # branching_variables_history = [] ##
             # branching
             max_λ_index = findmax(value.(λ))[2]
             path = paths[max_λ_index]
